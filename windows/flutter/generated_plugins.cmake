@@ -3,7 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
-  audioplayers_windows
+  dart_vlc
   flutter_volume_controller
   hotkey_manager_windows
   screen_retriever
