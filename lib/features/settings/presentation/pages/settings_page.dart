@@ -5,6 +5,7 @@ import '../providers/settings_database_providers.dart';
 import '../widgets/theme_mode_tile.dart';
 import '../widgets/hotkey_recorder_tile.dart';
 import '../widgets/volume_control_tile.dart';
+import '../widgets/audio_device_selector_tile.dart';
 import '../../../../core/util/logger.dart';
 
 /// Settings page
@@ -43,6 +44,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             _buildSectionHeader(context, 'Apariencia', Icons.palette),
             const SizedBox(height: 8),
             _buildThemeModeSection(context, themeModeSetting),
+
+            const SizedBox(height: 32),
+
+            // Audio Device Section (NEW - Virtual Cable Support)
+            _buildSectionHeader(
+              context,
+              'Dispositivo de Audio Virtual',
+              Icons.cable,
+            ),
+            const SizedBox(height: 8),
+            const AudioDeviceSelectorTile(),
 
             const SizedBox(height: 32),
 
