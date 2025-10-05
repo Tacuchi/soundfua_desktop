@@ -1,20 +1,26 @@
-import 'package:audioplayers/audioplayers.dart';
+import 'package:dart_vlc/dart_vlc.dart';
 import '../../../../core/util/logger.dart';
+import '../../../settings/domain/entities/audio_device.dart';
 
-/// Service for managing audio playback
+/// Service for managing audio playback with dart_vlc
 class AudioService {
   static final AudioService _instance = AudioService._internal();
   factory AudioService() => _instance;
   AudioService._internal() {
-    Logger().audioInfo('AudioService (legacy) initialized');
+    _audioPlayer = Player(
+      id: 0,
+      commandlineArguments: ['--no-video'], // Audio-only mode
+    );
+    Logger().audioInfo('AudioService initialized with dart_vlc');
   }
 
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  late final Player _audioPlayer;
   String? _currentlyPlayingPath;
   bool _isPlaying = false;
+  AudioDevice? _currentDevice;
 
   /// Get the current audio player instance
-  AudioPlayer get audioPlayer => _audioPlayer;
+  Player get audioPlayer => _audioPlayer;
 
   /// Check if audio is currently playing
   bool get isPlaying => _isPlaying;
@@ -22,11 +28,47 @@ class AudioService {
   /// Get the currently playing file path
   String? get currentlyPlayingPath => _currentlyPlayingPath;
 
+  /// Get current audio device
+  AudioDevice? get currentDevice => _currentDevice;
+
+  /// Set audio output device
+  void setDevice(AudioDevice? device) {
+    if (device == null) return;
+
+    try {
+      Logger().audioInfo(
+        'Setting audio device to: ${device.name}',
+        filePath: device.id,
+      );
+
+      // Get dart_vlc Device object
+      final vlcDevices = Devices.all;
+      final vlcDevice = vlcDevices.firstWhere(
+        (d) => d.id == device.id,
+        orElse: () => vlcDevices.first,
+      );
+
+      // Set device on player
+      _audioPlayer.setDevice(vlcDevice);
+      _currentDevice = device;
+
+      Logger().audioInfo(
+        'Audio device set successfully: ${device.name}',
+      );
+    } catch (e, stackTrace) {
+      Logger().audioError(
+        'Failed to set audio device',
+        error: e,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
   /// Play audio from file path
   Future<void> playAudio(String filePath) async {
     try {
       Logger().audioInfo(
-        'Legacy AudioService - Playing audio',
+        'AudioService - Playing audio',
         filePath: filePath,
       );
 
@@ -49,7 +91,10 @@ class AudioService {
         await stopAudio();
       }
 
-      await _audioPlayer.play(DeviceFileSource(filePath));
+      // Create media and play
+      final media = Media.file(filePath);
+      _audioPlayer.open(media, autoStart: true);
+
       _currentlyPlayingPath = filePath;
       _isPlaying = true;
       Logger().audioInfo(
@@ -138,14 +183,15 @@ class AudioService {
   }
 
   /// Get current position
-  Stream<Duration> get positionStream => _audioPlayer.onPositionChanged;
+  Stream<Duration?> get positionStream =>
+      _audioPlayer.positionStream.map((pos) => pos.position);
 
   /// Get duration
-  Stream<Duration> get durationStream => _audioPlayer.onDurationChanged;
+  Stream<Duration?> get durationStream =>
+      _audioPlayer.positionStream.map((pos) => pos.duration);
 
   /// Listen to player state changes
-  Stream<PlayerState> get playerStateStream =>
-      _audioPlayer.onPlayerStateChanged;
+  Stream<PlaybackState> get playerStateStream => _audioPlayer.playbackStream;
 
   /// Dispose resources
   void dispose() {

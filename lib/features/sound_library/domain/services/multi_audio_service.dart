@@ -1,69 +1,62 @@
-import 'package:audioplayers/audioplayers.dart';
+import 'package:dart_vlc/dart_vlc.dart';
 import 'dart:async';
+import 'dart:io';
 import '../../../../core/util/logger.dart';
+import '../../../settings/domain/entities/audio_device.dart';
 
-/// Individual audio instance for managing a single audio playback
+/// Individual audio instance for managing a single audio playback with dart_vlc
 class AudioInstance {
   final String id;
   final String filePath;
-  final AudioPlayer player;
-  final StreamController<Duration> _positionController =
-      StreamController<Duration>.broadcast();
-  final StreamController<Duration> _durationController =
-      StreamController<Duration>.broadcast();
-  final StreamController<PlayerState> _stateController =
-      StreamController<PlayerState>.broadcast();
+  final Player player;
+  final StreamController<PositionState> _positionController =
+      StreamController<PositionState>.broadcast();
+  final StreamController<PlaybackState> _stateController =
+      StreamController<PlaybackState>.broadcast();
 
   bool _isDisposed = false;
-  PlayerState _currentState = PlayerState.stopped;
-  Duration _currentPosition = Duration.zero;
-  Duration _totalDuration = Duration.zero;
+  PlaybackState _currentState = PlaybackState();
+  PositionState _currentPosition = PositionState();
 
-  AudioInstance({required this.id, required this.filePath})
-    : player = AudioPlayer() {
+  AudioInstance({required this.id, required this.filePath, required int playerId})
+      : player = Player(
+          id: playerId,
+          commandlineArguments: ['--no-video'], // Audio-only mode
+        ) {
     Logger().audioInfo('Creating new audio instance', filePath: filePath);
     _initializeListeners();
   }
 
   void _initializeListeners() {
     // Position listener
-    player.onPositionChanged.listen((position) {
+    player.positionStream.listen((position) {
       if (!_isDisposed) {
         _currentPosition = position;
         _positionController.add(position);
         Logger().audioDebug(
-          'Position changed: ${position.inMilliseconds}ms',
-          filePath: filePath,
-        );
-      }
-    });
-
-    // Duration listener
-    player.onDurationChanged.listen((duration) {
-      if (!_isDisposed) {
-        _totalDuration = duration;
-        _durationController.add(duration);
-        Logger().audioDebug(
-          'Duration changed: ${duration.inMilliseconds}ms',
+          'Position changed: ${position.position?.inMilliseconds ?? 0}ms',
           filePath: filePath,
         );
       }
     });
 
     // State listener
-    player.onPlayerStateChanged.listen((state) {
+    player.playbackStream.listen((state) {
       if (!_isDisposed) {
         _currentState = state;
         _stateController.add(state);
-        Logger().audioInfo('State changed: ${state.name}', filePath: filePath);
+        Logger().audioInfo(
+          'State changed: isPlaying=${state.isPlaying}, isCompleted=${state.isCompleted}',
+          filePath: filePath,
+        );
 
         // Clean up when playback completes
-        if (state == PlayerState.completed) {
+        if (state.isCompleted) {
           Logger().audioInfo(
             'Playback completed, scheduling cleanup',
             filePath: filePath,
           );
-          Timer(Duration(seconds: 1), () {
+          Timer(const Duration(seconds: 1), () {
             if (!_isDisposed) {
               dispose();
             }
@@ -71,18 +64,14 @@ class AudioInstance {
         }
       }
     });
-
-    // Error listener
-    player.onPlayerComplete.listen((_) {
-      Logger().audioInfo('Player completed', filePath: filePath);
-    });
   }
 
   /// Start playing audio
   Future<void> play() async {
     try {
       Logger().audioInfo('Starting playback', filePath: filePath);
-      await player.play(DeviceFileSource(filePath));
+      final media = Media.file(File(filePath));
+      player.open(media, autoStart: true);
       Logger().audioInfo('Playback started successfully', filePath: filePath);
     } catch (e, stackTrace) {
       Logger().audioError(
@@ -99,7 +88,7 @@ class AudioInstance {
   Future<void> pause() async {
     try {
       Logger().audioInfo('Pausing playback', filePath: filePath);
-      await player.pause();
+      player.pause();
     } catch (e, stackTrace) {
       Logger().audioError(
         'Failed to pause playback',
@@ -115,7 +104,7 @@ class AudioInstance {
   Future<void> resume() async {
     try {
       Logger().audioInfo('Resuming playback', filePath: filePath);
-      await player.resume();
+      player.play();
     } catch (e, stackTrace) {
       Logger().audioError(
         'Failed to resume playback',
@@ -131,7 +120,7 @@ class AudioInstance {
   Future<void> stop() async {
     try {
       Logger().audioInfo('Stopping playback', filePath: filePath);
-      await player.stop();
+      player.stop();
     } catch (e, stackTrace) {
       Logger().audioError(
         'Failed to stop playback',
@@ -150,7 +139,7 @@ class AudioInstance {
         'Seeking to position: ${position.inMilliseconds}ms',
         filePath: filePath,
       );
-      await player.seek(position);
+      player.seek(position);
     } catch (e, stackTrace) {
       Logger().audioError(
         'Failed to seek',
@@ -162,32 +151,51 @@ class AudioInstance {
     }
   }
 
+  /// Set audio device for this player
+  void setDevice(AudioDevice device) {
+    try {
+      final vlcDevices = Devices.all;
+      final vlcDevice = vlcDevices.firstWhere(
+        (d) => d.id == device.id,
+        orElse: () => vlcDevices.first,
+      );
+      player.setDevice(vlcDevice);
+      Logger().audioInfo(
+        'Device set to ${device.name} for instance',
+        filePath: filePath,
+      );
+    } catch (e) {
+      Logger().audioError(
+        'Failed to set device for instance',
+        filePath: filePath,
+        error: e,
+      );
+    }
+  }
+
   /// Get current position
-  Duration get currentPosition => _currentPosition;
+  Duration get currentPosition => _currentPosition.position ?? Duration.zero;
 
   /// Get total duration
-  Duration get totalDuration => _totalDuration;
+  Duration get totalDuration => _currentPosition.duration ?? Duration.zero;
 
   /// Get current state
-  PlayerState get currentState => _currentState;
+  PlaybackState get currentState => _currentState;
 
   /// Position stream
-  Stream<Duration> get positionStream => _positionController.stream;
-
-  /// Duration stream
-  Stream<Duration> get durationStream => _durationController.stream;
+  Stream<PositionState> get positionStream => _positionController.stream;
 
   /// State stream
-  Stream<PlayerState> get stateStream => _stateController.stream;
+  Stream<PlaybackState> get stateStream => _stateController.stream;
 
   /// Check if currently playing
-  bool get isPlaying => _currentState == PlayerState.playing;
+  bool get isPlaying => _currentState.isPlaying;
 
   /// Check if paused
-  bool get isPaused => _currentState == PlayerState.paused;
+  bool get isPaused => !_currentState.isPlaying && currentPosition > Duration.zero;
 
   /// Check if stopped
-  bool get isStopped => _currentState == PlayerState.stopped;
+  bool get isStopped => !_currentState.isPlaying && currentPosition == Duration.zero;
 
   /// Dispose resources
   void dispose() {
@@ -199,7 +207,6 @@ class AudioInstance {
     try {
       player.dispose();
       _positionController.close();
-      _durationController.close();
       _stateController.close();
     } catch (e, stackTrace) {
       Logger().audioError(
@@ -212,12 +219,12 @@ class AudioInstance {
   }
 }
 
-/// Enhanced audio service supporting multiple concurrent playbacks
+/// Enhanced audio service supporting multiple concurrent playbacks with dart_vlc
 class MultiAudioService {
   static final MultiAudioService _instance = MultiAudioService._internal();
   factory MultiAudioService() => _instance;
   MultiAudioService._internal() {
-    Logger().audioInfo('MultiAudioService initialized');
+    Logger().audioInfo('MultiAudioService initialized with dart_vlc');
   }
 
   final Map<String, AudioInstance> _activeInstances = {};
@@ -227,6 +234,10 @@ class MultiAudioService {
   // Global volume control
   double _globalVolume = 0.7; // Default volume (70%)
   bool _isMuted = false;
+  AudioDevice? _currentDevice;
+
+  // Player ID counter for unique player instances
+  int _nextPlayerId = 100; // Start from 100 to avoid conflicts
 
   /// Get all active instances
   Map<String, AudioInstance> get activeInstances =>
@@ -241,6 +252,31 @@ class MultiAudioService {
 
   /// Get current mute state
   bool get isMuted => _isMuted;
+
+  /// Get current audio device
+  AudioDevice? get currentDevice => _currentDevice;
+
+  /// Set audio device for all players
+  Future<void> setDevice(AudioDevice? device) async {
+    if (device == null) return;
+
+    _currentDevice = device;
+    Logger().audioInfo(
+      'Setting global device to: ${device.name}',
+    );
+
+    // Apply device to all active instances
+    for (final instance in _activeInstances.values) {
+      try {
+        instance.setDevice(device);
+      } catch (e) {
+        Logger().audioError(
+          'Failed to set device for instance ${instance.id}',
+          error: e,
+        );
+      }
+    }
+  }
 
   /// Set global volume (0.0 to 1.0)
   Future<void> setGlobalVolume(double volume) async {
@@ -277,7 +313,7 @@ class MultiAudioService {
 
     for (final instance in _activeInstances.values) {
       try {
-        await instance.player.setVolume(effectiveVolume);
+        instance.player.setVolume(effectiveVolume);
         Logger().audioDebug(
           'Applied volume ${(effectiveVolume * 100).round()}% to instance',
           filePath: instance.filePath,
@@ -299,9 +335,14 @@ class MultiAudioService {
 
       // Generate unique ID for this instance
       final instanceId = '${filePath}_${DateTime.now().millisecondsSinceEpoch}';
+      final playerId = _nextPlayerId++;
 
       // Create new audio instance
-      final instance = AudioInstance(id: instanceId, filePath: filePath);
+      final instance = AudioInstance(
+        id: instanceId,
+        filePath: filePath,
+        playerId: playerId,
+      );
 
       // Add to active instances
       _activeInstances[instanceId] = instance;
@@ -311,18 +352,23 @@ class MultiAudioService {
 
       // Listen for completion to clean up
       instance.stateStream.listen((state) {
-        if (state == PlayerState.completed || state == PlayerState.stopped) {
+        if (state.isCompleted || (!state.isPlaying && instance.currentPosition == Duration.zero)) {
           _cleanupInstance(instanceId);
         }
       });
 
       // Apply current volume settings to new instance
       final effectiveVolume = _isMuted ? 0.0 : _globalVolume;
-      await instance.player.setVolume(effectiveVolume);
+      instance.player.setVolume(effectiveVolume);
       Logger().audioDebug(
         'Applied volume ${(effectiveVolume * 100).round()}% to new instance',
         filePath: filePath,
       );
+
+      // Apply current device if set
+      if (_currentDevice != null) {
+        instance.setDevice(_currentDevice!);
+      }
 
       // Start playback
       await instance.play();
