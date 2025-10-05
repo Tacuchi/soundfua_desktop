@@ -23,6 +23,10 @@ import '../../features/settings/data/repositories/settings_database_repository_i
 import '../../features/settings/data/datasources/local/settings_local_data_source.dart';
 import '../../features/settings/data/datasources/local/settings_database_data_source.dart';
 
+// Audio Device Services
+import '../../features/settings/domain/services/audio_device_service.dart';
+import '../../features/sound_library/domain/services/multi_audio_service.dart';
+
 // Data Sources Providers
 final soundFileDataSourceProvider = Provider<SoundFileDataSource>((ref) {
   return SoundFileDataSourceImpl();
@@ -92,4 +96,16 @@ final getThemeModeSettingProvider = Provider<GetThemeModeSetting>((ref) {
 
 final saveThemeModeSettingProvider = Provider<SaveThemeModeSetting>((ref) {
   return SaveThemeModeSetting(ref.read(settingsRepositoryProvider));
+});
+
+// === AUDIO DEVICE FEATURE ===
+
+// Audio Device Service Provider
+final audioDeviceServiceProvider = Provider<AudioDeviceService>((ref) {
+  return AudioDeviceService();
+});
+
+// Multi Audio Service Provider (singleton)
+final multiAudioServiceProvider = Provider<MultiAudioService>((ref) {
+  return MultiAudioService();
 });

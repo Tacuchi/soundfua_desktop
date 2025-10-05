@@ -6,6 +6,8 @@ import '../../../../core/util/logger.dart';
 import '../../../sound_library/domain/entities/sound.dart';
 import '../../../sound_library/domain/services/multi_audio_service.dart';
 import '../../../settings/domain/entities/keyboard_shortcut_setting.dart';
+import '../../../settings/domain/entities/audio_device.dart';
+import '../../../settings/domain/services/audio_device_service.dart';
 
 /// Service for managing quick sound overlay functionality
 class QuickSoundService {
@@ -19,11 +21,13 @@ class QuickSoundService {
       'quick_sounds_last_selected_index';
 
   final MultiAudioService _audioService = MultiAudioService();
+  final AudioDeviceService _audioDeviceService = AudioDeviceService();
   SharedPreferences? _prefs;
   bool _isOverlayVisible = false;
   HotKey? _currentHotKey;
   List<Sound> _currentSounds = [];
   int _selectedIndex = 0;
+  AudioDevice? _currentDevice;
 
   // Stream controllers for state management
   final StreamController<bool> _visibilityController =
@@ -61,6 +65,21 @@ class QuickSoundService {
 
       // Initialize SharedPreferences if not already done
       await _initializePreferences();
+
+      // Initialize AudioDeviceService
+      if (_prefs != null) {
+        await _audioDeviceService.initialize(_prefs!);
+        _currentDevice = await _audioDeviceService.loadSavedDevice();
+
+        // Apply saved device to audio service
+        if (_currentDevice != null) {
+          await _audioService.setDevice(_currentDevice);
+          Logger().info(
+            'Applied saved audio device: ${_currentDevice!.name}',
+            tag: 'QUICK_SOUNDS',
+          );
+        }
+      }
 
       // Load last selected index
       await _loadLastSelectedIndex();

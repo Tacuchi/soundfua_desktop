@@ -3,18 +3,34 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:hotkey_manager/hotkey_manager.dart';
+import 'package:dart_vlc/dart_vlc.dart';
 import 'features/sound_library/presentation/pages/home_page.dart';
 import 'features/settings/presentation/providers/settings_database_providers.dart';
 import 'features/settings/domain/entities/theme_mode_setting.dart';
+import 'features/settings/domain/services/audio_device_service.dart';
 import 'features/quick_sounds/presentation/widgets/quick_sound_overlay_manager.dart';
 import 'features/quick_sounds/presentation/widgets/permissions_checker.dart';
 import 'core/services/system_tray_service.dart';
 import 'core/widgets/window_lifecycle_manager.dart';
+import 'core/util/logger.dart';
 
 import 'core/di/injection.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize DartVLC for audio playback with device selection
+  try {
+    DartVLC.initialize();
+    Logger().info('DartVLC initialized successfully', tag: 'MAIN');
+  } catch (e, stackTrace) {
+    Logger().error(
+      'Failed to initialize DartVLC',
+      tag: 'MAIN',
+      error: e,
+      stackTrace: stackTrace,
+    );
+  }
 
   // Initialize window manager
   await windowManager.ensureInitialized();
@@ -41,6 +57,21 @@ void main() async {
 
   // Initialize shared preferences
   final sharedPreferences = await SharedPreferences.getInstance();
+
+  // Initialize AudioDeviceService with SharedPreferences
+  try {
+    final audioDeviceService =
+        AudioDeviceService();
+    await audioDeviceService.initialize(sharedPreferences);
+    Logger().info('AudioDeviceService initialized', tag: 'MAIN');
+  } catch (e, stackTrace) {
+    Logger().error(
+      'Failed to initialize AudioDeviceService',
+      tag: 'MAIN',
+      error: e,
+      stackTrace: stackTrace,
+    );
+  }
 
   runApp(
     ProviderScope(
