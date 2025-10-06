@@ -57,33 +57,24 @@ class SoundRepositoryImpl implements SoundRepository {
   @override
   Future<Either<Failure, void>> syncFolder(String folderPath) async {
     try {
-      print('INFO: Iniciando sincronización de carpeta: $folderPath');
-
       final soundModels = await fileDataSource.readFolder(folderPath);
-      print('INFO: ${soundModels.length} archivos encontrados');
 
       await database.transaction(() async {
         await localDataSource.deleteAllSounds();
-        print('INFO: BD limpiada');
 
         if (soundModels.isNotEmpty) {
           await localDataSource.insertAll(soundModels);
-          print('INFO: ${soundModels.length} sonidos insertados');
         }
 
         await database.setSetting('library_path', folderPath);
-        print('INFO: Ruta guardada en settings');
       });
 
-      print('INFO: Sincronización completada exitosamente');
       return const Right(null);
     } on FileSystemException catch (e) {
-      print('ERROR: FileSystemException durante sync: $e');
       return Left(
         Failure.file(message: 'Error al leer carpeta: ${e.message}'),
       );
     } catch (e) {
-      print('ERROR: Error inesperado durante sync: $e');
       return Left(Failure.unknown(message: 'Error al sincronizar: $e'));
     }
   }

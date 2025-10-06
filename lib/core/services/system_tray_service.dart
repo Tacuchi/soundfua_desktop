@@ -30,26 +30,19 @@ class SystemTrayService {
 
   Future<void> _initSystemTray() async {
     String iconPath = await _getIconPath();
-    print('DEBUG: SystemTrayService - Icon path: $iconPath');
 
     await _systemTray.initSystemTray(
       title: 'SoundFua',
       iconPath: iconPath,
       toolTip: 'SoundFua Overlay Desktop',
     );
-    print('DEBUG: SystemTrayService - System tray initialized');
 
     _systemTray.registerSystemTrayEventHandler((eventName) {
-      print('DEBUG: SystemTrayService - Tray event received: $eventName');
-      if (eventName == kSystemTrayEventClick) {
-        print('DEBUG: SystemTrayService - Left click detected, showing menu');
-        _systemTray.popUpContextMenu();
-      } else if (eventName == kSystemTrayEventRightClick) {
-        print('DEBUG: SystemTrayService - Right click detected, showing menu');
+      if (eventName == kSystemTrayEventClick ||
+          eventName == kSystemTrayEventRightClick) {
         _systemTray.popUpContextMenu();
       }
     });
-    print('DEBUG: SystemTrayService - Event handler registered');
   }
 
   Future<String> _getIconPath() async {
@@ -81,28 +74,19 @@ class SystemTrayService {
     required Future<void> Function() onConfigurationPressed,
     required void Function() onExitPressed,
   }) async {
-    print('DEBUG: SystemTrayService - Building menu...');
     await _menu.buildFrom([
       MenuItemLabel(
         label: 'Configuración',
-        onClicked: (menuItem) async {
-          print('DEBUG: SystemTrayService - Menu item "Configuración" clicked');
-          await onConfigurationPressed();
-          print('DEBUG: SystemTrayService - onConfigurationPressed callback completed');
-        },
+        onClicked: (menuItem) async => await onConfigurationPressed(),
       ),
       MenuSeparator(),
       MenuItemLabel(
         label: 'Salir',
-        onClicked: (menuItem) {
-          print('DEBUG: SystemTrayService - Menu item "Salir" clicked');
-          onExitPressed();
-        },
+        onClicked: (menuItem) => onExitPressed(),
       ),
     ]);
 
     await _systemTray.setContextMenu(_menu);
-    print('DEBUG: SystemTrayService - Menu built and set successfully');
   }
 
   Future<void> dispose() async {

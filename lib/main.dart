@@ -13,14 +13,7 @@ import 'package:soundfua_desktop/features/settings/presentation/pages/settings_p
 void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Si se reciben argumentos, es una subventana
-  // desktop_multi_window envía: ['multi_window', 'windowId', 'arguments']
   if (args.isNotEmpty && args.first == 'multi_window') {
-    final windowId = int.parse(args[1]);
-    print('DEBUG: SubWindow started with ID: $windowId');
-    
-    // Importar dinámicamente el entry point de la ventana de configuración
-    // Esta ventana se maneja con su propio MaterialApp
     runApp(
       const ProviderScope(
         child: SettingsWindowApp(),
@@ -29,7 +22,6 @@ void main(List<String> args) async {
     return;
   }
 
-  // Ventana principal (overlay)
   await windowManager.ensureInitialized();
   await hotKeyManager.unregisterAll();
 
@@ -43,17 +35,10 @@ void main(List<String> args) async {
   );
 
   await windowManager.waitUntilReadyToShow(windowOptions, () async {
-    print('DEBUG: Main window ready to show');
     await windowManager.show();
-    print('DEBUG: Main window shown');
-    // Start hidden (transparent and non-interactive)
     await windowManager.setOpacity(0.0);
     await windowManager.setIgnoreMouseEvents(true);
-    print('DEBUG: Main window started hidden (opacity=0.0, mouse events disabled)');
     await windowManager.setPreventClose(true);
-    print('DEBUG: setPreventClose(true) called');
-    final preventClose = await windowManager.isPreventClose();
-    print('DEBUG: isPreventClose() = $preventClose');
   });
 
   runApp(
@@ -90,83 +75,54 @@ class _SoundfuaAppState extends State<SoundfuaApp> with WindowListener {
   }
 
   Future<void> _initServices() async {
-    // Initialize hotkey service
     await _overlayHotkeyService.initialize();
-
-    // Initialize system tray
-    print('DEBUG: Initializing system tray...');
     await _systemTrayService.initialize(
       onConfigurationPressed: _openSettingsWindow,
       onExitPressed: () async {
-        print('DEBUG: Exit pressed - cleaning up...');
         await _overlayHotkeyService.dispose();
         exit(0);
       },
     );
-    print('DEBUG: Services initialized');
   }
 
   Future<void> _openSettingsWindow() async {
-    print('DEBUG: === Opening settings window as separate window ===');
-    
-    // Si ya existe una ventana de configuración, verificar si aún está abierta
     if (_settingsWindowId != null) {
-      // Obtener lista de ventanas abiertas
       final allWindowIds = await DesktopMultiWindow.getAllSubWindowIds();
       
       if (allWindowIds.contains(_settingsWindowId)) {
-        print('DEBUG: Settings window $_settingsWindowId already exists, bringing to front');
-        // La ventana existe, solo mostrarla (por si estaba minimizada)
         try {
           await WindowController.fromWindowId(_settingsWindowId!).show();
-        } catch (e) {
-          print('DEBUG: Could not show window: $e');
-        }
+        } catch (_) {}
         return;
       } else {
-        print('DEBUG: Settings window $_settingsWindowId no longer exists');
         _settingsWindowId = null;
       }
     }
     
     try {
       final window = await DesktopMultiWindow.createWindow(
-        jsonEncode({
-          'type': 'settings',
-        }),
+        jsonEncode({'type': 'settings'}),
       );
       
       _settingsWindowId = window.windowId;
-      print('DEBUG: Settings window created with ID: ${window.windowId}');
       
-      // Configurar la ventana pero no mostrarla aún
       await window.setFrame(const Offset(100, 100) & const Size(900, 700));
       await window.center();
       await window.setTitle('SoundFua - Configuración');
-      
-      // Esperar un momento para que Flutter inicialice antes de mostrar
       await Future.delayed(const Duration(milliseconds: 300));
-      
       await window.show();
-      
-      print('DEBUG: Settings window configured and shown');
-    } catch (e) {
-      print('ERROR: Failed to create settings window: $e');
+    } catch (_) {
       _settingsWindowId = null;
     }
   }
 
   @override
   void onWindowClose() async {
-    print('DEBUG: === onWindowClose called - hiding to tray ===');
     await windowManager.hide();
-    print('DEBUG: Window hidden to tray');
   }
 
   @override
-  void onWindowEvent(String eventName) {
-    print('DEBUG: Window event: $eventName');
-  }
+  void onWindowEvent(String eventName) {}
 
   @override
   Widget build(BuildContext context) {
@@ -193,24 +149,11 @@ class _SoundfuaAppState extends State<SoundfuaApp> with WindowListener {
   }
 }
 
-/// App para la ventana de configuración
-class SettingsWindowApp extends StatefulWidget {
+class SettingsWindowApp extends StatelessWidget {
   const SettingsWindowApp({super.key});
 
   @override
-  State<SettingsWindowApp> createState() => _SettingsWindowAppState();
-}
-
-class _SettingsWindowAppState extends State<SettingsWindowApp> {
-  @override
-  void initState() {
-    super.initState();
-    print('DEBUG: SettingsWindowApp initState called');
-  }
-
-  @override
   Widget build(BuildContext context) {
-    print('DEBUG: Building SettingsWindowApp');
     return MaterialApp(
       title: 'SoundFua - Configuración',
       debugShowCheckedModeBanner: false,
