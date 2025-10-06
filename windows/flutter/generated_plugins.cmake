@@ -3,9 +3,8 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
-  dart_vlc
-  flutter_volume_controller
   hotkey_manager_windows
+  media_kit_libs_windows_audio
   screen_retriever
   sqlite3_flutter_libs
   system_tray
