@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
 import 'package:system_tray/system_tray.dart';
 import 'package:path/path.dart' as path;
 

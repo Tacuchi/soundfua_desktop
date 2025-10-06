@@ -3,7 +3,6 @@ import 'package:dartz/dartz.dart';
 import 'package:soundfua_desktop/core/error/failures.dart';
 import 'package:soundfua_desktop/features/audio/domain/entities/audio_device.dart';
 import 'package:soundfua_desktop/features/audio/domain/services/audio_device_service.dart';
-import 'package:media_kit/media_kit.dart';
 
 class AudioDeviceServiceImpl implements AudioDeviceService {
   @override

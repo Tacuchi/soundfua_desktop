@@ -5,7 +5,6 @@ import 'package:soundfua_desktop/features/audio/domain/services/audio_service.da
 
 class AudioServiceImpl implements AudioService {
   final Player _player = Player();
-  String? _currentDeviceId;
   double _volume = 1.0;
 
   AudioServiceImpl() {
@@ -39,7 +38,6 @@ class AudioServiceImpl implements AudioService {
   @override
   Future<Either<Failure, void>> setOutputDevice(String deviceId) async {
     try {
-      _currentDeviceId = deviceId;
       return const Right(null);
     } catch (e) {
       return Left(Failure.unknown(
