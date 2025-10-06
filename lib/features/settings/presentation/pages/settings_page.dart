@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:soundfua_desktop/features/audio/presentation/widgets/audio_settings_section.dart';
 import 'package:soundfua_desktop/features/overlay/presentation/providers/sound_providers.dart';
 
 class SettingsPage extends ConsumerWidget {
@@ -225,6 +226,10 @@ class SettingsPage extends ConsumerWidget {
                 ),
               ),
             ),
+            const SizedBox(height: 32),
+            const Divider(),
+            const SizedBox(height: 32),
+            const AudioSettingsSection(),
           ],
         ),
       ),
