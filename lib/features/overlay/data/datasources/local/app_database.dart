@@ -24,9 +24,11 @@ class Sounds extends Table {
 }
 
 class Settings extends Table {
-  TextColumn get key =>
-      text().customConstraint('PRIMARY KEY NOT NULL')();
+  TextColumn get key => text()();
   TextColumn get value => text().nullable()();
+  
+  @override
+  Set<Column> get primaryKey => {key};
 }
 
 @DriftDatabase(tables: [Sounds, Settings])
@@ -34,7 +36,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -52,6 +54,12 @@ class AppDatabase extends _$AppDatabase {
             'CREATE INDEX IF NOT EXISTS idx_sounds_last_played_at '
             'ON sounds(last_played_at DESC)',
           );
+        },
+        onUpgrade: (Migrator m, int from, int to) async {
+          if (from < 2) {
+            await customStatement('DROP TABLE IF EXISTS settings');
+            await m.createTable(settings);
+          }
         },
       );
 

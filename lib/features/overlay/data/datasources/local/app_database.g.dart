@@ -530,7 +530,6 @@ class $SettingsTable extends Settings with TableInfo<$SettingsTable, Setting> {
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
-    $customConstraints: 'PRIMARY KEY NOT NULL',
   );
   static const VerificationMeta _valueMeta = const VerificationMeta('value');
   @override
