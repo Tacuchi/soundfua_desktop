@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:soundfua_desktop/features/overlay/data/datasources/file/sound_file_datasource.dart';
 import 'package:soundfua_desktop/features/overlay/data/datasources/local/app_database.dart';
 import 'package:soundfua_desktop/features/overlay/data/datasources/local/sound_local_datasource.dart';
@@ -50,7 +51,29 @@ final syncFolderUseCaseProvider = Provider<SyncFolderUseCase>((ref) {
   return SyncFolderUseCase(repository);
 });
 
-final selectedFolderPathProvider = StateProvider<String?>((ref) => null);
+final selectedFolderPathProvider = StateNotifierProvider<SelectedFolderNotifier, String?>((ref) {
+  return SelectedFolderNotifier();
+});
+
+class SelectedFolderNotifier extends StateNotifier<String?> {
+  SelectedFolderNotifier() : super(null) {
+    _loadSavedFolder();
+  }
+
+  Future<void> _loadSavedFolder() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedPath = prefs.getString('library_folder_path');
+    if (savedPath != null) {
+      state = savedPath;
+    }
+  }
+
+  Future<void> setFolder(String path) async {
+    state = path;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('library_folder_path', path);
+  }
+}
 
 final soundsCountProvider = StreamProvider<int>((ref) {
   final localDataSource = ref.watch(soundLocalDataSourceProvider);

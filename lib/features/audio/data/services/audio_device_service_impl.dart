@@ -72,27 +72,32 @@ class AudioDeviceServiceImpl implements AudioDeviceService {
       final result = await Process.run('system_profiler', ['SPAudioDataType']);
       final output = result.stdout.toString();
 
-      final deviceNames = <String>[];
       final lines = output.split('\n');
+      String? currentDevice;
       
       for (var line in lines) {
-        if (line.trim().startsWith('_name:') || 
-            line.contains('Output Source:')) {
-          final match = RegExp(r':\s*(.+)$').firstMatch(line);
-          if (match != null) {
-            deviceNames.add(match.group(1)!.trim());
+        final trimmed = line.trim();
+        
+        if (trimmed.isNotEmpty && line.startsWith('        ') && !line.startsWith('          ')) {
+          if (trimmed.endsWith(':')) {
+            currentDevice = trimmed.substring(0, trimmed.length - 1);
           }
+        } else if (currentDevice != null && trimmed.contains('Output Channels:')) {
+          final isVirtual = _isVirtualCableName(currentDevice);
+          devices.add(AudioDevice(
+            id: 'macos_${devices.length}',
+            name: currentDevice,
+            isVirtualCable: isVirtual,
+          ));
+          currentDevice = null;
         }
       }
 
-      for (var i = 0; i < deviceNames.length; i++) {
-        final name = deviceNames[i];
-        final isVirtual = _isVirtualCableName(name);
-        
-        devices.add(AudioDevice(
-          id: 'macos_$i',
-          name: name,
-          isVirtualCable: isVirtual,
+      if (devices.isEmpty) {
+        devices.add(const AudioDevice(
+          id: 'default',
+          name: 'Default Audio Output',
+          isVirtualCable: false,
         ));
       }
     } catch (e) {

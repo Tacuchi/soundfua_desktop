@@ -99,9 +99,9 @@ class SettingsPage extends ConsumerWidget {
                             final path = await FilePicker.platform
                                 .getDirectoryPath();
                             if (path != null) {
-                              ref
+                              await ref
                                   .read(selectedFolderPathProvider.notifier)
-                                  .state = path;
+                                  .setFolder(path);
                             }
                           },
                           icon: const Icon(Icons.folder_open),
