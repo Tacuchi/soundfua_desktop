@@ -2,12 +2,15 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:hotkey_manager/hotkey_manager.dart';
 import 'package:soundfua_desktop/core/services/system_tray_service.dart';
+import 'package:soundfua_desktop/core/services/overlay_hotkey_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await windowManager.ensureInitialized();
+  await hotKeyManager.unregisterAll(); // Clean up any previous hotkeys
 
   const windowOptions = WindowOptions(
     size: Size(800, 600),
@@ -19,8 +22,17 @@ void main() async {
   );
 
   await windowManager.waitUntilReadyToShow(windowOptions, () async {
+    print('DEBUG: Window ready to show');
     await windowManager.show();
-    await windowManager.focus();
+    print('DEBUG: Window shown');
+    // Start hidden (transparent and non-interactive)
+    await windowManager.setOpacity(0.0);
+    await windowManager.setIgnoreMouseEvents(true);
+    print('DEBUG: Window started hidden (opacity=0.0, mouse events disabled)');
+    await windowManager.setPreventClose(true);
+    print('DEBUG: setPreventClose(true) called');
+    final preventClose = await windowManager.isPreventClose();
+    print('DEBUG: isPreventClose() = $preventClose');
   });
 
   runApp(
@@ -39,48 +51,57 @@ class SoundfuaApp extends StatefulWidget {
 
 class _SoundfuaAppState extends State<SoundfuaApp> with WindowListener {
   final SystemTrayService _systemTrayService = SystemTrayService();
+  final OverlayHotkeyService _overlayHotkeyService = OverlayHotkeyService();
 
   @override
   void initState() {
     super.initState();
     windowManager.addListener(this);
-    _initSystemTray();
+    _initServices();
   }
 
   @override
   void dispose() {
     windowManager.removeListener(this);
+    _overlayHotkeyService.dispose();
     super.dispose();
   }
 
-  Future<void> _initSystemTray() async {
+  Future<void> _initServices() async {
+    // Initialize hotkey service
+    await _overlayHotkeyService.initialize();
+
+    // Initialize system tray
+    print('DEBUG: Initializing system tray...');
     await _systemTrayService.initialize(
-      onConfigurationPressed: _handleConfigurationPressed,
-      onExitPressed: _handleExitPressed,
+      onConfigurationPressed: () async {
+        print('DEBUG: === Configuration pressed callback START ===');
+        try {
+          await _overlayHotkeyService.showOverlay();
+          print('DEBUG: === Configuration pressed callback END ===');
+        } catch (e) {
+          print('DEBUG: ERROR in configuration callback: $e');
+        }
+      },
+      onExitPressed: () async {
+        print('DEBUG: Exit pressed - cleaning up...');
+        await _overlayHotkeyService.dispose();
+        exit(0);
+      },
     );
-  }
-
-  void _handleConfigurationPressed() {
-    windowManager.show();
-    windowManager.focus();
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Configuración abierta desde System Tray'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
-  }
-
-  void _handleExitPressed() {
-    exit(0);
+    print('DEBUG: Services initialized');
   }
 
   @override
   void onWindowClose() async {
-    await windowManager.hide();
+    print('DEBUG: === onWindowClose called ===');
+    await _overlayHotkeyService.hideOverlay();
+    print('DEBUG: Overlay hidden via opacity');
+  }
+
+  @override
+  void onWindowEvent(String eventName) {
+    print('DEBUG: Window event: $eventName');
   }
 
   @override
@@ -160,13 +181,15 @@ class HomePage extends StatelessWidget {
                       ),
                     ),
                     SizedBox(height: 16),
-                    Text('✓ Click en icono del tray → Menú contextual'),
+                    Text('✓ Cmd+Shift+Space → Toggle visibilidad overlay'),
                     SizedBox(height: 8),
-                    Text('✓ Click en "Configuración" → Muestra ventana'),
+                    Text('✓ Click izq/der en icono → Menú contextual'),
                     SizedBox(height: 8),
-                    Text('✓ Click en "Salir" → Cierra la app'),
+                    Text('✓ Menú > "Configuración" → Muestra overlay'),
                     SizedBox(height: 8),
-                    Text('✓ Cerrar ventana (X) → Minimiza a tray'),
+                    Text('✓ Cerrar ventana (X) → Oculta overlay (mantiene posición)'),
+                    SizedBox(height: 8),
+                    Text('✓ Menú > "Salir" → Cierra la app'),
                   ],
                 ),
               ),
